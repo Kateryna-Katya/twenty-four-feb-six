@@ -1,147 +1,237 @@
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js';
+/**
+ * Twenty-Four-Feb-Six: Core Engine
+ * Технологии: Vanilla JS + SVG Interaction
+ */
 
 document.addEventListener('DOMContentLoaded', () => {
     
-    // --- 1. Инициализация иконок ---
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-
-    // --- 2. Мобильное меню («Бургер») ---
-    const burger = document.querySelector('.burger');
-    const mobileMenu = document.querySelector('.mobile-menu');
-    const closeMenu = document.querySelector('.mobile-menu__close');
-    const menuLinks = document.querySelectorAll('.mobile-menu__link');
-
-    const toggleMenu = () => mobileMenu.classList.toggle('mobile-menu--active');
-
-    burger?.addEventListener('click', toggleMenu);
-    closeMenu?.addEventListener('click', toggleMenu);
-    menuLinks.forEach(link => link.addEventListener('click', toggleMenu));
-
-    // --- 3. Header Scroll Effect ---
+    // --- 1. ГЛОБАЛЬНЫЙ СКРОЛЛ И ХЕДЕР ---
     const header = document.querySelector('.header');
+    
     window.addEventListener('scroll', () => {
-        header?.classList.toggle('header--scrolled', window.scrollY > 50);
+        if (window.scrollY > 50) {
+            header.classList.add('header--scrolled');
+        } else {
+            header.classList.remove('header--scrolled');
+        }
+        // Запуск анимации линии пути (если есть)
+        updatePathDrawing();
     });
 
-    // --- 4. Three.js Hero Scene ---
-    const initHeroScene = () => {
-        const container = document.getElementById('hero-canvas');
-        if (!container) return;
+    // --- 2. МОБИЛЬНОЕ МЕНЮ ---
+    const burger = document.getElementById('burger-btn');
+    const overlay = document.getElementById('mobile-overlay');
+    const mobileLinks = document.querySelectorAll('.mobile-link');
 
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        container.appendChild(renderer.domElement);
+    const toggleMenu = () => {
+        burger.classList.toggle('active');
+        overlay.classList.toggle('active');
+        document.body.style.overflow = overlay.classList.contains('active') ? 'hidden' : '';
+    };
 
-        const geometry = new THREE.BufferGeometry();
-        const vertices = [];
-        for (let i = 0; i < 4000; i++) {
-            vertices.push(THREE.MathUtils.randFloatSpread(2000), THREE.MathUtils.randFloatSpread(2000), THREE.MathUtils.randFloatSpread(2000));
+    if (burger) {
+        burger.addEventListener('click', toggleMenu);
+        mobileLinks.forEach(link => link.addEventListener('click', toggleMenu));
+    }
+
+    // --- 3. HERO: ИНТЕРАКТИВНОЕ ЯДРО (SVG MORPHING) ---
+    const coreLayers = document.getElementById('core-layers');
+    const mouse = { x: 0, y: 0 };
+    let time = 0;
+
+    if (coreLayers) {
+        // Создаем центральное "живое" ядро
+        const blob = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        blob.setAttribute("fill", "url(#core-grad)");
+        blob.setAttribute("filter", "url(#core-glow)");
+        coreLayers.appendChild(blob);
+
+        // Генерация органического пути
+        function createBlobPath(t) {
+            const points = [];
+            const numPoints = 8;
+            const radius = 60;
+            for (let i = 0; i < numPoints; i++) {
+                const angle = (i / numPoints) * Math.PI * 2;
+                const shift = Math.sin(t + i) * 12; // Колебания
+                const r = radius + shift;
+                const x = 200 + Math.cos(angle) * r + (mouse.x * 30);
+                const y = 200 + Math.sin(angle) * r + (mouse.y * 30);
+                points.push(`${i === 0 ? 'M' : 'L'} ${x} ${y}`);
+            }
+            return points.join(' ') + ' Z';
         }
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        const points = new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0x635BFF, size: 2, transparent: true, opacity: 0.6 }));
-        scene.add(points);
-        camera.position.z = 1000;
 
-        let mouseX = 0, mouseY = 0;
-        document.addEventListener('mousemove', (e) => {
-            mouseX = (e.clientX - window.innerWidth / 2) / 150;
-            mouseY = (e.clientY - window.innerHeight / 2) / 150;
+        function animateCore() {
+            time += 0.04;
+            blob.setAttribute("d", createBlobPath(time));
+            requestAnimationFrame(animateCore);
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / window.innerWidth) - 0.5;
+            mouse.y = (e.clientY / window.innerHeight) - 0.5;
         });
 
-        const animate = () => {
-            requestAnimationFrame(animate);
-            points.rotation.x += 0.0005; points.rotation.y += 0.0005;
-            camera.position.x += (mouseX - camera.position.x) * 0.05;
-            camera.position.y += (-mouseY - camera.position.y) * 0.05;
-            camera.lookAt(scene.position);
-            renderer.render(scene, camera);
-        };
-        animate();
-    };
+        animateCore();
+    }
 
-    // --- 5. Image Morphing (Strategies) ---
-    const initStrategyMorph = () => {
-        const items = document.querySelectorAll('.strategy-item');
-        const morphImg = document.querySelector('.morph-img');
-        const shapes = {
-            circle: 'circle(45% at 50% 50%)',
-            polygon: 'polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)',
-            blob: 'polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%)'
-        };
-        items.forEach(item => {
-            item.addEventListener('mouseenter', () => {
-                items.forEach(i => i.classList.remove('active'));
-                item.classList.add('active');
-                if(morphImg) morphImg.style.clipPath = shapes[item.dataset.shape] || shapes.circle;
-            });
+    // --- 4. SCROLL REVEAL (КАСКАДНОЕ ПОЯВЛЕНИЕ) ---
+    const revealOptions = { threshold: 0.15 };
+    const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('is-visible');
+                revealObserver.unobserve(entry.target);
+            }
         });
-    };
+    }, revealOptions);
 
-    // --- 6. Контактная форма + Валидация телефона + Капча ---
-    const initContactForm = () => {
-        const form = document.getElementById('ajax-form');
-        const phoneInput = document.getElementById('phone');
-        const questionEl = document.getElementById('captcha-question');
-        const messageEl = document.getElementById('form-message');
+    // Применяем к карточкам и секциям
+    document.querySelectorAll('.feature-card, .method-step, .bento-item, .section-head').forEach(el => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(30px)';
+        el.style.transition = 'all 0.8s cubic-bezier(0.2, 1, 0.3, 1)';
+        revealObserver.observe(el);
+    });
 
-        if (!form) return;
+    // CSS Helper для анимации
+    const style = document.createElement('style');
+    style.innerHTML = '.is-visible { opacity: 1 !important; transform: translateY(0) !important; }';
+    document.head.appendChild(style);
 
-        // Валидация телефона (только цифры и +)
-        phoneInput?.addEventListener('input', (e) => {
+    // --- 5. АНИМАЦИЯ СЧЕТЧИКОВ ---
+    const stats = document.querySelectorAll('.stat-num');
+    const countObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const target = parseInt(entry.target.getAttribute('data-target'));
+                let current = 0;
+                const increment = target / 50;
+                const updateCount = () => {
+                    if (current < target) {
+                        current += increment;
+                        entry.target.innerText = Math.ceil(current) + '+';
+                        setTimeout(updateCount, 30);
+                    } else {
+                        entry.target.innerText = target + '+';
+                    }
+                };
+                updateCount();
+                countObserver.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.5 });
+    stats.forEach(s => countObserver.observe(s));
+
+    // --- 6. PATH DRAWING (ЛИНИЯ В ОБУЧЕНИИ) ---
+    const pathDraw = document.getElementById('path-draw');
+    function updatePathDrawing() {
+        if (!pathDraw) return;
+        const rect = pathDraw.getBoundingClientRect();
+        const viewHeight = window.innerHeight;
+        
+        if (rect.top < viewHeight && rect.bottom > 0) {
+            const length = pathDraw.getTotalLength();
+            pathDraw.style.strokeDasharray = length;
+            const progress = (viewHeight - rect.top) / (viewHeight + rect.height);
+            pathDraw.style.strokeDashoffset = length * (1 - Math.min(Math.max(progress, 0), 1));
+        }
+    }
+
+    // --- 7. FAQ ACCORDION ---
+    document.querySelectorAll('.faq__question').forEach(q => {
+        q.addEventListener('click', () => {
+            const item = q.parentElement;
+            const isActive = item.classList.contains('active');
+            document.querySelectorAll('.faq__item').forEach(el => el.classList.remove('active'));
+            if (!isActive) item.classList.add('active');
+        });
+    });
+
+    // --- 8. КОНТАКТНАЯ ФОРМА И КАПЧА ---
+    const form = document.getElementById('ai-form');
+    if (form) {
+        const phoneInput = document.getElementById('phone-input');
+        const captchaLabel = document.getElementById('captcha-label');
+        const captchaInput = document.getElementById('captcha-input');
+        const formMessage = document.getElementById('form-message');
+
+        // Генерация капчи
+        const n1 = Math.floor(Math.random() * 10) + 1;
+        const n2 = Math.floor(Math.random() * 5) + 1;
+        const sum = n1 + n2;
+        captchaLabel.innerText = `Подтвердите, что вы не робот: ${n1} + ${n2} = ?`;
+
+        // Только цифры для телефона
+        phoneInput.addEventListener('input', (e) => {
             e.target.value = e.target.value.replace(/[^\d+]/g, '');
         });
 
-        // Генерация капчи
-        let n1 = Math.floor(Math.random() * 10), n2 = Math.floor(Math.random() * 10);
-        if(questionEl) questionEl.textContent = `${n1} + ${n2}`;
-
-        form.addEventListener('submit', async (e) => {
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
-            const answer = parseInt(document.getElementById('captcha-answer').value);
-            if (answer !== (n1 + n2)) {
-                messageEl.textContent = "Ошибка капчи!";
-                messageEl.className = "form-message error";
+            formMessage.style.display = 'none';
+
+            if (parseInt(captchaInput.value) !== sum) {
+                formMessage.textContent = 'Неверный ответ на защитный вопрос.';
+                formMessage.className = 'form__message error';
                 return;
             }
 
-            const btn = form.querySelector('button');
-            btn.disabled = true; btn.textContent = "Отправка...";
+            const btn = form.querySelector('.form__submit');
+            btn.disabled = true;
+            btn.innerText = 'Отправка данных...';
 
-            await new Promise(r => setTimeout(r, 1500)); // Имитация AJAX
-            
-            messageEl.textContent = "Успешно отправлено!";
-            messageEl.className = "form-message success";
-            form.reset();
-            btn.disabled = false; btn.innerHTML = 'Отправить запрос <i data-lucide="send"></i>';
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-        });
-    };
-
-    // --- 7. Cookie Popup ---
-    const initCookiePopup = () => {
-        const popup = document.getElementById('cookie-popup');
-        const acceptBtn = document.getElementById('cookie-accept');
-        if (!localStorage.getItem('cookies_accepted')) {
-            setTimeout(() => popup?.classList.add('cookie-popup--active'), 2000);
-        }
-        acceptBtn?.addEventListener('click', () => {
-            localStorage.setItem('cookies_accepted', 'true');
-            popup?.classList.remove('cookie-popup--active');
-        });
-    };
-
-    // --- Запуск ---
-    initHeroScene();
-    initStrategyMorph();
-    initContactForm();
-    initCookiePopup();
-    if (typeof Swiper !== 'undefined') {
-        new Swiper('.insights-slider', {
-            slidesPerView: 1, spaceBetween: 30, loop: true,
-            navigation: { nextEl: '.swiper-button-next-custom', prevEl: '.swiper-button-prev-custom' },
-            breakpoints: { 768: { slidesPerView: 2 }, 1024: { slidesPerView: 3 } }
+            // Имитация AJAX
+            setTimeout(() => {
+                formMessage.textContent = 'Запрос успешно отправлен! Платформа уже доступна для вас.';
+                formMessage.className = 'form__message success';
+                form.reset();
+                btn.disabled = false;
+                btn.innerText = 'Начать сейчас';
+            }, 1500);
         });
     }
+
+    // --- 9. COOKIE POLICY ---
+    const cookiePopup = document.getElementById('cookie-popup');
+    if (cookiePopup && !localStorage.getItem('cookies_accepted_v1')) {
+        setTimeout(() => cookiePopup.classList.add('active'), 2500);
+        document.getElementById('cookie-accept').addEventListener('click', () => {
+            localStorage.setItem('cookies_accepted_v1', 'true');
+            cookiePopup.classList.remove('active');
+        });
+    }
+
+    // --- 10. SMOOTH SCROLL ---
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            const targetId = this.getAttribute('href');
+            if (targetId === '#') return;
+            e.preventDefault();
+            const target = document.querySelector(targetId);
+            if (target) {
+                const headerOffset = 80;
+                const elementPosition = target.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+            }
+        });
+    });
+});
+// --- TABS LOGIC ---
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('data-target');
+        
+        // Переключаем кнопки
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Переключаем контент
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            pane.classList.remove('active');
+        });
+        document.getElementById(targetId).classList.add('active');
+    });
 });
